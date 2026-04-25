@@ -11,40 +11,7 @@
     "sell_trigger_price": 53.4691801071167,
     "reference_price": 49.50850009918213
   },
-  "fired_signals": [
-    {
-      "date": "2026-04-22",
-      "signal_type": "weekly",
-      "action": "buy",
-      "price": 58.21,
-      "fired_at": "2026-04-22T15:30:00+00:00",
-      "user_acknowledged": true
-    },
-    {
-      "date": "2026-04-15",
-      "signal_type": "weekly",
-      "action": "sell",
-      "price": 69.5,
-      "fired_at": "2026-04-15T14:45:00+00:00",
-      "user_acknowledged": true
-    },
-    {
-      "date": "2026-04-09",
-      "signal_type": "weekly",
-      "action": "buy",
-      "price": 40.44,
-      "fired_at": "2026-04-09T17:10:00+00:00",
-      "user_acknowledged": true
-    },
-    {
-      "date": "2026-04-25",
-      "signal_type": "monthly",
-      "action": "sell",
-      "price": 62.560001373291016,
-      "fired_at": "2026-04-25T06:12:27.821345+00:00",
-      "user_acknowledged": false
-    }
-  ],
+  "fired_signals": [],
   "holding_shares": 131.0,
   "avg_cost": 48.37,
   "cash_flow": 4962.0
