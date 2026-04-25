@@ -1,16 +1,26 @@
-"""状态文件读写 (v2)
+"""状态文件读写 (v3 - 多用户)
 
-state.json 字段:
-  - last_run_at: 最近一次脚本执行时间 (ISO UTC)
-  - last_quote: 最近一次价格快照 + 信号评估
-  - fired_signals: 触发过的信号列表
-      - 含 user_acknowledged / user_skipped / executed_shares / executed_price / executed_at
-  - holding_shares / avg_cost / cash_flow / realized_profit: 持仓状态
-      - 通过 dashboard "我已下单" 触发 Worker 写回更新
+state.json schema:
+  {
+    // 共享 (后端写)
+    "last_run_at": "...",
+    "last_quote": {...},
+    "fired_signals": [
+      { "date", "signal_type", "action", "price", "fired_at" }
+    ],
+    // 个人 (Worker 按 user_id 写, 后端不动)
+    "users": {
+      "wz": {
+        "holding_shares", "avg_cost", "cash_flow", "realized_profit",
+        "acks": [ { signal_id, date, signal_type, action, executed_shares, executed_price, acknowledged_at, delta } ],
+        "skips": [ { signal_id, date, signal_type, action, skipped_at } ]
+      },
+      "fp": { ... }
+    }
+  }
 
-GitHub Actions 写入 last_run_at + last_quote + fired_signals (新增).
-Cloudflare Worker 写入 fired_signals[i] 的 ack/skip 字段 + 持仓数字.
-两边互不冲突: 后端只动它该动的字段.
+迁移逻辑: 老格式扁平字段 (holding_shares 等) 自动转到 users.wz.
+后端 main.py 只动 last_run_at / last_quote / fired_signals, 永远不碰 users.*
 """
 from __future__ import annotations
 
@@ -23,23 +33,18 @@ from typing import Any
 
 STATE_FILE = Path(__file__).parent.parent / "state.json"
 
+# 默认用户 (老格式迁移目标)
+DEFAULT_USER = "wz"
+
 
 @dataclass
 class FiredSignal:
-    """已触发并通知过的信号 (用于去重 + 历史记录)"""
-    date: str        # ISO date YYYY-MM-DD (美东交易日)
-    signal_type: str # daily | weekly | monthly
-    action: str      # buy | sell
-    price: float     # 触发时的价格
-    fired_at: str    # ISO timestamp UTC
-
-    # v2 新增 (由 Cloudflare Worker 在用户点 "我已下单"/"跳过" 时填写):
-    user_acknowledged: bool = False
-    user_skipped: bool = False
-    executed_shares: float | None = None
-    executed_price: float | None = None
-    executed_at: str | None = None
-    skipped_at: str | None = None
+    """触发的信号事件 (共享)"""
+    date: str
+    signal_type: str
+    action: str
+    price: float
+    fired_at: str
 
 
 @dataclass
@@ -47,13 +52,10 @@ class State:
     last_run_at: str | None = None
     last_quote: dict[str, Any] | None = None
     fired_signals: list[FiredSignal] = field(default_factory=list)
-    holding_shares: float = 0.0
-    avg_cost: float = 0.0
-    cash_flow: float = 0.0
-    realized_profit: float = 0.0  # v2 新增: 累计已实现盈利
+    # 用户个人数据 - 后端不解析, 只保留原始 dict 透传
+    users: dict[str, dict] = field(default_factory=dict)
 
     def is_already_fired_today(self, date: str, signal_type: str, action: str) -> bool:
-        """同一天 + 同一种信号类型 + 同一动作 = 重复, 不再发通知."""
         return any(
             s.date == date and s.signal_type == signal_type and s.action == action
             for s in self.fired_signals
@@ -63,7 +65,6 @@ class State:
         if self.is_already_fired_today(signal.date, signal.signal_type, signal.action):
             return
         self.fired_signals.append(signal)
-        # 只保留最近 365 天, 防止文件越来越大
         cutoff = datetime.now(timezone.utc).timestamp() - 365 * 86400
         self.fired_signals = [
             s for s in self.fired_signals
@@ -75,14 +76,27 @@ class State:
             "last_run_at": self.last_run_at,
             "last_quote": self.last_quote,
             "fired_signals": [asdict(s) for s in self.fired_signals],
-            "holding_shares": self.holding_shares,
-            "avg_cost": self.avg_cost,
-            "cash_flow": self.cash_flow,
-            "realized_profit": self.realized_profit,
+            "users": self.users,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "State":
+        # 自动迁移: 老格式扁平字段 -> users.wz
+        users = d.get("users")
+        if users is None:
+            users = {}
+            # 迁移老字段
+            old_holding = d.get("holding_shares")
+            if old_holding is not None:
+                users[DEFAULT_USER] = {
+                    "holding_shares": float(old_holding),
+                    "avg_cost": float(d.get("avg_cost", 0)),
+                    "cash_flow": float(d.get("cash_flow", 0)),
+                    "realized_profit": float(d.get("realized_profit", 0)),
+                    "acks": [],
+                    "skips": [],
+                }
+
         return cls(
             last_run_at=d.get("last_run_at"),
             last_quote=d.get("last_quote"),
@@ -93,19 +107,10 @@ class State:
                     action=s["action"],
                     price=float(s["price"]),
                     fired_at=s["fired_at"],
-                    user_acknowledged=bool(s.get("user_acknowledged", False)),
-                    user_skipped=bool(s.get("user_skipped", False)),
-                    executed_shares=s.get("executed_shares"),
-                    executed_price=s.get("executed_price"),
-                    executed_at=s.get("executed_at"),
-                    skipped_at=s.get("skipped_at"),
                 )
                 for s in d.get("fired_signals", [])
             ],
-            holding_shares=float(d.get("holding_shares", 0)),
-            avg_cost=float(d.get("avg_cost", 0)),
-            cash_flow=float(d.get("cash_flow", 0)),
-            realized_profit=float(d.get("realized_profit", 0)),
+            users=users,
         )
 
 
@@ -117,10 +122,8 @@ def load_state(path: Path = STATE_FILE) -> State:
 
 
 def save_state(state: State, path: Path = STATE_FILE) -> None:
-    """写回 state.json. 注意: dashboard/Worker 修改的字段在这里会被保留,
-    因为 main.py 是先 load_state -> 改自己的字段 -> save_state.
-    Worker 修改的字段 (持仓数字、acked/skipped) 是在 main.py 跑完之后才发生,
-    所以也不会冲突."""
+    """写回 state.json. 注意: 只动 last_run_at / last_quote / fired_signals,
+    users 部分原样保留 (Worker 才改 users)."""
     state.last_run_at = datetime.now(timezone.utc).isoformat()
     with open(path, "w", encoding="utf-8") as f:
         json.dump(state.to_dict(), f, ensure_ascii=False, indent=2)
