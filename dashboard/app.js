@@ -5,7 +5,7 @@
 //
 // 部署后需要把下面的 WORKER_URL 改成你 Cloudflare 部署后拿到的网址
 
-const WORKER_URL = "https://tqqq-dashboard-api.YOUR_ACCOUNT.workers.dev";  // 改成你的 Worker URL
+const WORKER_URL = "https://stockmonitor.wendizeng11.workers.dev";  // 改成你的 Worker URL
 
 const STATE_URL = "./state.json";
 const CONFIG_URL = "./config.yaml";
