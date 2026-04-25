@@ -1,0 +1,44 @@
+{
+  "last_run_at": "2026-04-24T18:23:00+00:00",
+  "last_quote": {
+    "price": 62.56,
+    "timestamp": 1745515380,
+    "source": "yahoo",
+    "signal_type": "weekly",
+    "change_rate": 0.0658,
+    "action": "hold",
+    "buy_trigger_price": 54.59,
+    "sell_trigger_price": 67.55,
+    "reference_price": 58.69
+  },
+  "fired_signals": [
+    {
+      "date": "2026-04-22",
+      "signal_type": "weekly",
+      "action": "buy",
+      "price": 58.21,
+      "fired_at": "2026-04-22T15:30:00+00:00",
+      "user_acknowledged": true
+    },
+    {
+      "date": "2026-04-15",
+      "signal_type": "weekly",
+      "action": "sell",
+      "price": 69.50,
+      "fired_at": "2026-04-15T14:45:00+00:00",
+      "user_acknowledged": true
+    },
+    {
+      "date": "2026-04-09",
+      "signal_type": "weekly",
+      "action": "buy",
+      "price": 40.44,
+      "fired_at": "2026-04-09T17:10:00+00:00",
+      "user_acknowledged": true
+    }
+  ],
+  "holding_shares": 131,
+  "avg_cost": 48.37,
+  "cash_flow": 4962,
+  "xirr": 0.6563
+}
