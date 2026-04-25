@@ -1,38 +1,33 @@
-// TQQQ 网格信号 PWA Dashboard v2
+// TQQQ 网格信号 PWA Dashboard v3
 //
-// state.json / config.yaml 由 deploy_pages.yml workflow 复制到同目录, 浏览器走相对路径读
-// 写操作走 Cloudflare Worker (WORKER_URL), 用一个共享密码做鉴权
-//
-// 部署后需要把下面的 WORKER_URL 改成你 Cloudflare 部署后拿到的网址
+// 多用户独立数据 (WZ / FP), 通过 X-User-Id header 区分.
+// 共享: last_quote, fired_signals (信号事件)
+// 个人: users[uid] = { holdings, acks, skips }
 
-const WORKER_URL = "https://stockmonitor.wendizeng11.workers.dev";  // 改成你的 Worker URL
+const WORKER_URL = "https://stockmonitor.wendizeng11.workers.dev";
 
 const STATE_URL = "./state.json";
 const CONFIG_URL = "./config.yaml";
-
 const STALE_MINUTES = 15;
 const AUTO_REFRESH_SECONDS = 60;
+const USER_NAMES = { wz: "Wendi", fp: "老公" };
 
 let state = null;
 let config = null;
+let currentUserId = localStorage.getItem("tqqq_user_id") || "";
 let dashboardPassword = localStorage.getItem("tqqq_password") || "";
-let currentSignalForAck = null;  // {action, suggested_shares, suggested_price}
+let currentSignalForAck = null;
 
-// ---------------- 工具函数 ----------------
+// ---------------- 工具 ----------------
 
 function fmtUsd(n, frac = 2) {
   if (n === null || n === undefined || isNaN(n)) return "$--";
-  return "$" + Number(n).toLocaleString(undefined, {
-    minimumFractionDigits: frac,
-    maximumFractionDigits: frac,
-  });
+  return "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: frac, maximumFractionDigits: frac });
 }
-
 function fmtPct(n, frac = 2) {
   if (n === null || n === undefined || isNaN(n)) return "--";
   return (Number(n) * 100).toFixed(frac) + "%";
 }
-
 function fmtLocalTime(isoStr) {
   if (!isoStr) return "--";
   const d = new Date(isoStr);
@@ -41,7 +36,6 @@ function fmtLocalTime(isoStr) {
     hour: "2-digit", minute: "2-digit",
   });
 }
-
 function fmtRelativeTime(isoStr) {
   if (!isoStr) return "--";
   const d = new Date(isoStr);
@@ -52,33 +46,55 @@ function fmtRelativeTime(isoStr) {
   if (hours < 24) return `${hours} 小时前`;
   return `${Math.floor(hours / 24)} 天前`;
 }
-
-function showToast(text, durationMs = 2000) {
+function showToast(text, durationMs = 2200) {
   const t = document.getElementById("toast");
   t.textContent = text;
   t.classList.remove("hide");
   setTimeout(() => t.classList.add("hide"), durationMs);
 }
+function closeModal(id) {
+  document.getElementById(id).classList.add("hide");
+}
+function showConfirm(title, message, onYes) {
+  document.getElementById("confirm-title").textContent = title;
+  document.getElementById("confirm-message").textContent = message;
+  const btn = document.getElementById("confirm-yes-btn");
+  btn.onclick = () => {
+    closeModal("modal-confirm");
+    onYes();
+  };
+  document.getElementById("modal-confirm").classList.remove("hide");
+}
+function getMe() {
+  return state?.users?.[currentUserId] || {
+    holding_shares: 0, avg_cost: 0, cash_flow: 0, realized_profit: 0,
+    acks: [], skips: [],
+  };
+}
+function signalId(date, signal_type, action) {
+  return `${date}_${signal_type}_${action}`;
+}
 
 // ---------------- Worker API ----------------
 
 async function callWorker(endpoint, body = {}) {
-  if (!dashboardPassword) {
-    promptPassword();
-    throw new Error("需要密码");
+  if (!dashboardPassword || !currentUserId) {
+    promptLogin();
+    throw new Error("需要登录");
   }
   const r = await fetch(`${WORKER_URL}${endpoint}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Auth-Token": dashboardPassword,
+      "X-User-Id": currentUserId,
     },
     body: JSON.stringify(body),
   });
   if (r.status === 401) {
     localStorage.removeItem("tqqq_password");
     dashboardPassword = "";
-    promptPassword();
+    promptLogin();
     throw new Error("密码错误");
   }
   if (!r.ok) {
@@ -88,22 +104,41 @@ async function callWorker(endpoint, body = {}) {
   return await r.json();
 }
 
-// ---------------- 密码弹窗 ----------------
+// ---------------- 登录 ----------------
 
-function promptPassword() {
-  document.getElementById("modal-password").classList.remove("hide");
-  setTimeout(() => document.getElementById("modal-password-input").focus(), 100);
+let pickedUser = currentUserId || "";
+function pickUser(uid) {
+  pickedUser = uid;
+  document.getElementById("pick-wz").classList.toggle("selected", uid === "wz");
+  document.getElementById("pick-fp").classList.toggle("selected", uid === "fp");
 }
 
-async function submitPassword() {
-  const pwd = document.getElementById("modal-password-input").value;
-  if (!pwd) return;
-  dashboardPassword = pwd;
-  // 用 /api/auth 验证一下
+function promptLogin() {
+  pickedUser = currentUserId || "";
+  if (currentUserId) pickUser(currentUserId);
+  document.getElementById("modal-login").classList.remove("hide");
+  setTimeout(() => document.getElementById("login-password-input").focus(), 100);
+}
+
+async function submitLogin() {
+  if (!pickedUser) {
+    showToast("请先选择身份");
+    return;
+  }
+  const pwd = document.getElementById("login-password-input").value;
+  if (!pwd) {
+    showToast("请输入密码");
+    return;
+  }
+  // 用 /api/auth 验证
   try {
     const r = await fetch(`${WORKER_URL}/api/auth`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Auth-Token": pwd },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Auth-Token": pwd,
+        "X-User-Id": pickedUser,
+      },
       body: "{}",
     });
     if (r.status === 401) {
@@ -111,21 +146,49 @@ async function submitPassword() {
       return;
     }
     if (!r.ok) {
-      showToast("Worker 连接失败 - 检查 WORKER_URL 是否正确");
+      showToast("Worker 连接失败 - 检查 WORKER_URL");
       return;
     }
+    currentUserId = pickedUser;
+    dashboardPassword = pwd;
+    localStorage.setItem("tqqq_user_id", currentUserId);
     localStorage.setItem("tqqq_password", pwd);
-    document.getElementById("modal-password").classList.add("hide");
-    showToast("登录成功");
+    closeModal("modal-login");
+    showToast(`已登录为 ${USER_NAMES[currentUserId]}`);
+    updateUserAvatar();
+    reloadAll();
   } catch (e) {
-    showToast("无法连接 Worker: " + e.message);
+    showToast("无法连接: " + e.message);
   }
 }
 
-// 回车提交密码
+function updateUserAvatar() {
+  const btn = document.getElementById("user-avatar");
+  if (currentUserId) {
+    btn.textContent = currentUserId.toUpperCase();
+    btn.classList.toggle("fp", currentUserId === "fp");
+  } else {
+    btn.textContent = "?";
+  }
+}
+
+function toggleUserMenu() {
+  showConfirm(
+    `当前: ${USER_NAMES[currentUserId] || "未登录"}`,
+    "切换到另一个用户 / 退出登录?",
+    () => {
+      localStorage.removeItem("tqqq_user_id");
+      localStorage.removeItem("tqqq_password");
+      currentUserId = "";
+      dashboardPassword = "";
+      promptLogin();
+    }
+  );
+}
+
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !document.getElementById("modal-password").classList.contains("hide")) {
-    submitPassword();
+  if (e.key === "Enter" && !document.getElementById("modal-login").classList.contains("hide")) {
+    submitLogin();
   }
 });
 
@@ -137,7 +200,7 @@ async function fetchState() {
     if (!r.ok) throw new Error("HTTP " + r.status);
     state = await r.json();
   } catch (e) {
-    document.getElementById("page-sub").textContent = "无法读 state.json: " + e.message;
+    document.getElementById("page-sub").textContent = "无法读 state.json";
     return null;
   }
   return state;
@@ -154,7 +217,7 @@ async function fetchConfig() {
       signal: { type: "weekly", drop_threshold: -0.07, rise_threshold: 0.08 },
       trade: { buy_amount_usd: 500, sell_amount_usd: 500 },
       notifications: {
-        pushover: { enabled: true, recipients: ["wendi"] },
+        pushover: { enabled: true, recipients: [] },
         email: { enabled: true, to: [] },
       },
     };
@@ -162,7 +225,6 @@ async function fetchConfig() {
   return config;
 }
 
-// 极简 YAML 解析 (仅满足我们这个 config.yaml 结构)
 function parseSimpleYaml(text) {
   const root = {};
   const stack = [{ obj: root, indent: -1, parent: null, key: null }];
@@ -170,19 +232,15 @@ function parseSimpleYaml(text) {
     const line = rawLine.replace(/#.*$/, "").trimEnd();
     if (!line.trim()) continue;
     const indent = rawLine.match(/^ */)[0].length;
-
     while (stack.length > 1 && stack[stack.length - 1].indent >= indent) stack.pop();
     const top = stack[stack.length - 1];
     let parent = top.obj;
-
     if (line.trim().startsWith("- ")) {
       const val = line.trim().slice(2).trim();
       if (top.key && !Array.isArray(top.parent[top.key])) top.parent[top.key] = [];
-      const arr = top.parent[top.key];
-      arr.push(parseScalar(val));
+      top.parent[top.key].push(parseScalar(val));
       continue;
     }
-
     const m = line.match(/^(\s*)([\w-]+):\s*(.*)$/);
     if (!m) continue;
     const [, , key, valRaw] = m;
@@ -196,12 +254,10 @@ function parseSimpleYaml(text) {
   }
   return root;
 }
-
 function parseScalar(s) {
   s = s.trim();
   if (s === "true") return true;
   if (s === "false") return false;
-  if (s === "null" || s === "~") return null;
   if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
   if (s === "[]") return [];
   return s.replace(/^["']|["']$/g, "");
@@ -210,17 +266,17 @@ function parseScalar(s) {
 // ---------------- 渲染: 今日 ----------------
 
 function renderToday() {
-  if (!state || !config) return;
+  if (!state || !config || !currentUserId) return;
+  const me = getMe();
   const q = state.last_quote || {};
   const sigType = config.signal.type;
   document.getElementById("signal-type-pill").textContent =
     { daily: "每日", weekly: "每周", monthly: "每月" }[sigType] + " 信号";
 
-  // 持仓
-  const shares = state.holding_shares || 0;
+  const shares = me.holding_shares || 0;
   const price = q.price || 0;
   const value = shares * price;
-  const cost = state.avg_cost || 0;
+  const cost = me.avg_cost || 0;
   const pnl = value - shares * cost;
   document.getElementById("h-shares").textContent = shares.toFixed(0) + " 股";
   document.getElementById("h-value").textContent = fmtUsd(value, 0);
@@ -229,7 +285,6 @@ function renderToday() {
   pnlEl.classList.toggle("up", pnl >= 0);
   pnlEl.classList.toggle("down", pnl < 0);
 
-  // 当前价
   document.getElementById("current-price").textContent = fmtUsd(price);
   const dayChangeEl = document.getElementById("day-change");
   if (q.change_rate !== undefined) {
@@ -239,7 +294,6 @@ function renderToday() {
     dayChangeEl.classList.toggle("down", q.change_rate < 0);
   }
 
-  // 触发预测
   document.getElementById("buy-trigger").textContent = fmtUsd(q.buy_trigger_price);
   document.getElementById("sell-trigger").textContent = fmtUsd(q.sell_trigger_price);
   if (q.buy_trigger_price && price) {
@@ -254,14 +308,14 @@ function renderToday() {
   document.getElementById("forecast-note").textContent =
     `明天 TQQQ 若跌到 ${fmtUsd(q.buy_trigger_price)} 触发买入, 涨到 ${fmtUsd(q.sell_trigger_price)} 触发卖出.`;
 
-  // 信号警告卡
+  // 信号警告卡: 当前用户是否未操作?
   const alertCard = document.getElementById("alert-card");
   if (q.action === "buy" || q.action === "sell") {
     const today = new Date().toISOString().slice(0, 10);
-    const fired = (state.fired_signals || []).find(
-      s => s.date === today && s.signal_type === sigType && s.action === q.action
-    );
-    if (fired && !fired.user_acknowledged && !fired.user_skipped) {
+    const sid = signalId(today, sigType, q.action);
+    const acked = (me.acks || []).find(a => a.signal_id === sid);
+    const skipped = (me.skips || []).find(s => s.signal_id === sid);
+    if (!acked && !skipped) {
       alertCard.classList.remove("hide");
       const actionLabel = q.action === "buy" ? "买入" : "卖出";
       document.getElementById("alert-action").textContent = "已触发" + actionLabel;
@@ -269,10 +323,7 @@ function renderToday() {
         `${{ daily: "每日", weekly: "每周", monthly: "每月" }[sigType]}信号`;
       document.getElementById("alert-desc").textContent =
         `变化率 ${fmtPct(q.change_rate)} (阈值 ${fmtPct(q.action === "buy" ? config.signal.drop_threshold : config.signal.rise_threshold, 0)})`;
-      // 缓存信号信息供 ack 对话框用
-      const tradeAmount = q.action === "buy"
-        ? config.trade.buy_amount_usd
-        : config.trade.sell_amount_usd;
+      const tradeAmount = q.action === "buy" ? config.trade.buy_amount_usd : config.trade.sell_amount_usd;
       currentSignalForAck = {
         date: today,
         signal_type: sigType,
@@ -315,14 +366,15 @@ function renderSettings() {
 // ---------------- 渲染: 历史 ----------------
 
 function renderHistory() {
-  if (!state) return;
+  if (!state || !currentUserId) return;
+  const me = getMe();
   const q = state.last_quote || {};
 
-  const shares = state.holding_shares || 0;
+  const shares = me.holding_shares || 0;
   const price = q.price || 0;
-  const cost = state.avg_cost || 0;
-  const cashflow = state.cash_flow || 0;
-  const realized = state.realized_profit || 0;
+  const cost = me.avg_cost || 0;
+  const cashflow = me.cash_flow || 0;
+  const realized = me.realized_profit || 0;
   const currentValue = shares * price;
   const totalAssets = currentValue + realized;
 
@@ -333,7 +385,7 @@ function renderHistory() {
   document.getElementById("m-total").textContent = fmtUsd(totalAssets, 0);
   document.getElementById("m-realized").textContent = (realized >= 0 ? "+" : "") + fmtUsd(realized, 0);
 
-  // 信号列表
+  // 信号记录: 把所有 fired_signals 跟我的 acks/skips 合并显示
   const list = document.getElementById("signal-list");
   list.innerHTML = "";
   const fired = state.fired_signals || [];
@@ -342,22 +394,37 @@ function renderHistory() {
     return;
   }
   fired.slice().reverse().slice(0, 30).forEach(s => {
+    const sid = signalId(s.date, s.signal_type, s.action);
+    const myAck = (me.acks || []).find(a => a.signal_id === sid);
+    const mySkip = (me.skips || []).find(sk => sk.signal_id === sid);
+
     const row = document.createElement("div");
     row.className = "list-item";
-    let statusTag = "";
-    if (s.user_acknowledged) statusTag = `<span class="tag-ack">✓ 已成交</span>`;
-    else if (s.user_skipped) statusTag = `<span class="tag-skipped">已跳过</span>`;
+
     const actionTag = s.action === "buy"
       ? `<span class="tag-buy">买</span>`
       : `<span class="tag-sell">卖</span>`;
-    const execNote = s.user_acknowledged && s.executed_shares
-      ? `<span class="label-mute">${s.executed_shares} 股 @ ${fmtUsd(s.executed_price)}</span>`
-      : `<span class="label-mute">@ ${fmtUsd(s.price)}</span>`;
+
+    let detailText, statusEl, undoBtn = "";
+    if (myAck) {
+      detailText = `${myAck.executed_shares} 股 × ${fmtUsd(myAck.executed_price)}`;
+      statusEl = `<span class="tag-ack">✓ 已成交</span>`;
+      undoBtn = `<button class="undo-btn" onclick="undoAck('${s.date}','${s.signal_type}','${s.action}')">↺</button>`;
+    } else if (mySkip) {
+      detailText = `@ ${fmtUsd(s.price)}`;
+      statusEl = `<span class="tag-skipped">已跳过</span>`;
+      undoBtn = `<button class="undo-btn" onclick="undoSkip('${s.date}','${s.signal_type}','${s.action}')">↺</button>`;
+    } else {
+      detailText = `@ ${fmtUsd(s.price)}`;
+      statusEl = `<span class="tag-pending">未操作</span>`;
+    }
+
     row.innerHTML = `
-      <span style="flex: 0 0 auto;">${s.date}</span>
+      <span style="font-size: 12px;">${s.date}</span>
       ${actionTag}
-      ${execNote}
-      ${statusTag}
+      <span class="label-mute">${detailText}</span>
+      ${statusEl}
+      ${undoBtn}
     `;
     list.appendChild(row);
   });
@@ -369,7 +436,6 @@ function renderNotify() {
   if (!config) return;
   const recList = document.getElementById("recipients-list");
   recList.innerHTML = "";
-
   const grouped = {};
   (config.notifications.pushover?.recipients || []).forEach(r => {
     if (!grouped[r]) grouped[r] = { name: r, channels: [] };
@@ -384,13 +450,9 @@ function renderNotify() {
     const row = document.createElement("div");
     row.className = "opt";
     row.style.justifyContent = "space-between";
-    row.innerHTML = `
-      <span class="name">${p.name}</span>
-      <span class="label-mute">${p.channels.join(" + ")}</span>
-    `;
+    row.innerHTML = `<span class="name">${p.name}</span><span class="label-mute">${p.channels.join(" + ")}</span>`;
     recList.appendChild(row);
   });
-
   const chList = document.getElementById("channels-list");
   chList.innerHTML = "";
   const channels = [
@@ -401,10 +463,7 @@ function renderNotify() {
     const row = document.createElement("div");
     row.className = "opt";
     row.style.justifyContent = "space-between";
-    row.innerHTML = `
-      <div><div>${c.label}</div><div class="label-mute">${c.desc}</div></div>
-      <span class="label-mute">${c.enabled ? "开启" : "关闭"}</span>
-    `;
+    row.innerHTML = `<div><div>${c.label}</div><div class="label-mute">${c.desc}</div></div><span class="label-mute">${c.enabled ? "开启" : "关闭"}</span>`;
     chList.appendChild(row);
   });
 }
@@ -424,7 +483,7 @@ function switchTab(name) {
   if (name === "notify") renderNotify();
 }
 
-// ---------------- 已下单对话框 ----------------
+// ---------------- 已下单 ----------------
 
 function openAckDialog() {
   if (!currentSignalForAck) {
@@ -438,11 +497,29 @@ function openAckDialog() {
     `${{ daily: "每日", weekly: "每周", monthly: "每月" }[sig.signal_type]}信号 · 建议 ${sig.suggested_shares.toFixed(2)} 股 @ ${fmtUsd(sig.suggested_price)}`;
   document.getElementById("ack-shares").value = sig.suggested_shares.toFixed(2);
   document.getElementById("ack-price").value = sig.suggested_price.toFixed(2);
+  document.getElementById("ack-warning").classList.add("hide");
   document.getElementById("modal-ack").classList.remove("hide");
+  validateAckForm();
 }
 
-function closeAckDialog() {
-  document.getElementById("modal-ack").classList.add("hide");
+function validateAckForm() {
+  if (!currentSignalForAck) return;
+  const sig = currentSignalForAck;
+  const shares = parseFloat(document.getElementById("ack-shares").value);
+  const warningEl = document.getElementById("ack-warning");
+  const btn = document.getElementById("ack-confirm-btn");
+
+  if (sig.action === "sell") {
+    const me = getMe();
+    if (shares > (me.holding_shares || 0)) {
+      warningEl.textContent = `⚠ 你只有 ${me.holding_shares} 股, 不能卖 ${shares} 股`;
+      warningEl.classList.remove("hide");
+      btn.disabled = true;
+      return;
+    }
+  }
+  warningEl.classList.add("hide");
+  btn.disabled = false;
 }
 
 async function confirmAck() {
@@ -451,7 +528,7 @@ async function confirmAck() {
   const shares = parseFloat(document.getElementById("ack-shares").value);
   const price = parseFloat(document.getElementById("ack-price").value);
   if (!shares || !price || shares <= 0 || price <= 0) {
-    showToast("请填写有效的股数和价格");
+    showToast("请填写有效数字");
     return;
   }
   const btn = document.getElementById("ack-confirm-btn");
@@ -462,9 +539,9 @@ async function confirmAck() {
       date: sig.date, signal_type: sig.signal_type, action: sig.action,
       shares, price,
     });
-    closeAckDialog();
+    closeModal("modal-ack");
     showToast("已成交, 持仓已更新");
-    setTimeout(reloadAll, 1500);
+    setTimeout(reloadAll, 1200);
   } catch (e) {
     showToast("失败: " + e.message);
   } finally {
@@ -475,20 +552,93 @@ async function confirmAck() {
 
 async function skipSignal() {
   if (!currentSignalForAck) return;
-  if (!confirm("确认跳过这次信号? (今天不再提醒, 第二天会重新评估)")) return;
   const sig = currentSignalForAck;
+  showConfirm(
+    "跳过本次信号?",
+    "今天不再提醒你这条信号. 之后如果想反悔, 在历史 Tab 点 ↺ 撤销.",
+    async () => {
+      try {
+        await callWorker("/api/skip", {
+          date: sig.date, signal_type: sig.signal_type, action: sig.action,
+        });
+        showToast("已跳过");
+        setTimeout(reloadAll, 1000);
+      } catch (e) {
+        showToast("失败: " + e.message);
+      }
+    }
+  );
+}
+
+// ---------------- 撤销 ----------------
+
+async function undoAck(date, signal_type, action) {
+  showConfirm(
+    "撤销这次成交?",
+    `这会把持仓恢复到下单前的状态. 确认撤销?`,
+    async () => {
+      try {
+        await callWorker("/api/undo-ack", { date, signal_type, action });
+        showToast("已撤销");
+        setTimeout(reloadAll, 1000);
+      } catch (e) {
+        showToast("失败: " + e.message);
+      }
+    }
+  );
+}
+
+async function undoSkip(date, signal_type, action) {
+  showConfirm(
+    "撤销跳过?",
+    "这条信号会重新出现在今日 Tab.",
+    async () => {
+      try {
+        await callWorker("/api/undo-skip", { date, signal_type, action });
+        showToast("已撤销");
+        setTimeout(reloadAll, 1000);
+      } catch (e) {
+        showToast("失败: " + e.message);
+      }
+    }
+  );
+}
+
+// ---------------- 编辑持仓 ----------------
+
+function openHoldingsEditor() {
+  const me = getMe();
+  document.getElementById("hd-shares").value = me.holding_shares || 0;
+  document.getElementById("hd-cost").value = me.avg_cost || 0;
+  document.getElementById("hd-cashflow").value = me.cash_flow || 0;
+  document.getElementById("hd-realized").value = me.realized_profit || 0;
+  document.getElementById("modal-holdings").classList.remove("hide");
+}
+
+async function confirmHoldings() {
+  const payload = {
+    holding_shares: parseFloat(document.getElementById("hd-shares").value),
+    avg_cost: parseFloat(document.getElementById("hd-cost").value),
+    cash_flow: parseFloat(document.getElementById("hd-cashflow").value),
+    realized_profit: parseFloat(document.getElementById("hd-realized").value),
+  };
+  const btn = document.getElementById("holdings-confirm-btn");
+  btn.disabled = true;
+  btn.textContent = "保存中...";
   try {
-    await callWorker("/api/skip", {
-      date: sig.date, signal_type: sig.signal_type, action: sig.action,
-    });
-    showToast("已跳过");
-    setTimeout(reloadAll, 1000);
+    await callWorker("/api/set-holdings", payload);
+    closeModal("modal-holdings");
+    showToast("持仓已更新");
+    setTimeout(reloadAll, 1200);
   } catch (e) {
     showToast("失败: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "保存";
   }
 }
 
-// ---------------- 设置 Tab 写入 config ----------------
+// ---------------- 设置写入 ----------------
 
 async function updateSignalType(t) {
   if (!config) return;
@@ -496,10 +646,10 @@ async function updateSignalType(t) {
   renderSettings();
   try {
     await callWorker("/api/config", { signal_type: t });
-    showToast(`信号类型改为${{ daily: "每日", weekly: "每周", monthly: "每月" }[t]}`);
+    showToast(`信号类型改为 ${{ daily: "每日", weekly: "每周", monthly: "每月" }[t]}`);
     setTimeout(reloadAll, 1500);
   } catch (e) {
-    showToast("写回 config 失败: " + e.message);
+    showToast("失败: " + e.message);
   }
 }
 
@@ -535,22 +685,23 @@ async function updateTradeAmount(which, val) {
 async function manualRefresh() {
   const btn = document.getElementById("refresh-btn");
   btn.classList.add("spin");
+  showToast("已触发后端, 等待 30-60 秒...", 4000);
   try {
     await callWorker("/api/refresh", {});
-    showToast("已触发后端, 30-60 秒后自动同步");
-    // 5 秒后开始轮询新数据
-    let tries = 0;
     const oldTime = state?.last_run_at;
+    let tries = 0;
     const poll = setInterval(async () => {
       tries++;
       await fetchState();
-      if (state?.last_run_at !== oldTime || tries >= 18) {
+      if (state?.last_run_at !== oldTime) {
         clearInterval(poll);
         btn.classList.remove("spin");
-        if (state?.last_run_at !== oldTime) {
-          renderToday();
-          showToast("数据已更新");
-        }
+        renderToday();
+        showToast("数据已更新 ✓");
+      } else if (tries >= 18) {
+        clearInterval(poll);
+        btn.classList.remove("spin");
+        showToast("等待超时, 请稍后再试");
       }
     }, 5000);
   } catch (e) {
@@ -570,9 +721,13 @@ async function reloadAll() {
 // ---------------- 初始化 ----------------
 
 async function init() {
+  updateUserAvatar();
+  if (!currentUserId || !dashboardPassword) {
+    promptLogin();
+    return;
+  }
   await Promise.all([fetchState(), fetchConfig()]);
   renderToday();
-  // 每分钟自动重新加载 state.json
   setInterval(async () => {
     await fetchState();
     const activeTab = document.querySelector(".tab-item.active")?.dataset.tab || "today";

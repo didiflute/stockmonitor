@@ -25,27 +25,35 @@
   .header h1 { margin: 0; font-size: 17px; font-weight: 500; }
   .header .sub { font-size: 12px; color: #888; margin-top: 2px; }
   .header .right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-  .tag-pill { font-size: 12px; color: #185FA5; background: #E6F1FB; padding: 3px 10px; border-radius: 999px; }
+  .tag-pill { font-size: 11px; color: #185FA5; background: #E6F1FB; padding: 3px 9px; border-radius: 999px; }
   .icon-btn {
     width: 36px; height: 36px; border-radius: 50%; border: 0.5px solid #ddd; background: #fff;
     display: flex; align-items: center; justify-content: center; cursor: pointer;
-    color: #555; padding: 0;
+    color: #555; padding: 0; flex-shrink: 0;
   }
   .icon-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
   .icon-btn:active { background: #f5f5f4; }
   .icon-btn.spin svg { animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  .avatar-btn {
+    width: 32px; height: 32px; border-radius: 50%; border: 0.5px solid #ddd;
+    background: #E6F1FB; color: #185FA5; font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    flex-shrink: 0;
+  }
+  .avatar-btn.fp { background: #FAEEDA; color: #854F0B; }
+
   .updated-banner { padding: 8px 16px; background: #fafaf8; font-size: 12px; color: #666; text-align: center; border-bottom: 0.5px solid #eee; }
   .updated-banner.stale { background: #FCEBEB; color: #A32D2D; }
 
   .body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
-  .section-h { font-size: 12px; color: #888; margin-bottom: 6px; letter-spacing: 0.3px; }
+  .section-h { font-size: 12px; color: #888; margin-bottom: 6px; letter-spacing: 0.3px; display: flex; justify-content: space-between; align-items: center; }
+  .section-h .edit-link { font-size: 12px; color: #185FA5; cursor: pointer; }
   .card { background: #f5f5f4; border-radius: 10px; padding: 12px 14px; }
   .card-flat { background: #fff; border: 0.5px solid #e5e5e3; border-radius: 10px; padding: 12px 14px; }
   .row { display: flex; justify-content: space-between; align-items: center; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
   .label { font-size: 12px; color: #666; }
   .label-mute { font-size: 11px; color: #999; }
   .num-big { font-size: 28px; font-weight: 500; line-height: 1; }
@@ -60,12 +68,17 @@
   .alert .actions { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
   .btn-primary { padding: 8px 14px; background: #fff; border: 0.5px solid #854F0B; color: #854F0B; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
   .btn-link { padding: 8px; background: transparent; border: 0; color: #888; font-size: 12px; cursor: pointer; }
-  .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 0.5px solid #eee; font-size: 13px; gap: 8px; }
+
+  .list-item { display: grid; grid-template-columns: auto auto 1fr auto auto; align-items: center; padding: 10px 0; border-bottom: 0.5px solid #eee; font-size: 13px; gap: 8px; }
   .list-item:last-child { border-bottom: 0; }
-  .tag-buy { background: #EAF3DE; color: #3B6D11; padding: 2px 7px; border-radius: 4px; font-size: 11px; }
-  .tag-sell { background: #FCEBEB; color: #A32D2D; padding: 2px 7px; border-radius: 4px; font-size: 11px; }
+  .tag-buy { background: #EAF3DE; color: #3B6D11; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .tag-sell { background: #FCEBEB; color: #A32D2D; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; }
   .tag-ack { background: #E6F1FB; color: #185FA5; padding: 2px 7px; border-radius: 4px; font-size: 10px; }
   .tag-skipped { background: #f0f0ee; color: #888; padding: 2px 7px; border-radius: 4px; font-size: 10px; }
+  .tag-pending { background: #FAEEDA; color: #854F0B; padding: 2px 7px; border-radius: 4px; font-size: 10px; }
+  .undo-btn { font-size: 11px; color: #888; cursor: pointer; padding: 4px 8px; background: transparent; border: 0.5px solid #ddd; border-radius: 6px; }
+  .undo-btn:active { background: #f5f5f4; }
+
   .opt { display: flex; align-items: center; padding: 12px 0; border-bottom: 0.5px solid #eee; font-size: 14px; }
   .opt:last-child { border-bottom: 0; }
   .opt input[type="number"], .opt input[type="text"] {
@@ -119,9 +132,19 @@
   .modal .btn-cancel { background: #f5f5f4; color: #444; }
   .modal .btn-confirm { background: #185FA5; color: white; }
   .modal .btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+  .modal .warning { color: #A32D2D; font-size: 12px; margin-top: 6px; }
+
+  .user-picker { display: flex; gap: 12px; margin-bottom: 16px; }
+  .user-picker .opt-card {
+    flex: 1; padding: 16px; border: 1.5px solid #ddd; border-radius: 10px; text-align: center;
+    cursor: pointer; font-size: 14px;
+  }
+  .user-picker .opt-card.selected { border-color: #185FA5; background: #E6F1FB; color: #185FA5; }
+  .user-picker .opt-card .big { font-size: 24px; font-weight: 500; }
+
   .toast {
     position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.8); color: white; padding: 10px 18px; border-radius: 22px;
+    background: rgba(0,0,0,0.85); color: white; padding: 10px 18px; border-radius: 22px;
     font-size: 13px; z-index: 999; max-width: 90%;
   }
 </style>
@@ -140,6 +163,7 @@
       <button id="refresh-btn" class="icon-btn" onclick="manualRefresh()" title="手动刷新">
         <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>
       </button>
+      <button id="user-avatar" class="avatar-btn" onclick="toggleUserMenu()">--</button>
     </div>
   </div>
 
@@ -171,7 +195,7 @@
     </div>
 
     <div>
-      <div class="section-h">明日触发预测</div>
+      <div class="section-h"><span>明日触发预测</span></div>
       <div class="grid-2">
         <div class="card"><div class="label">买入触发价</div><div class="num-med down" id="buy-trigger">$--</div><div class="label-mute" id="buy-distance">--</div></div>
         <div class="card"><div class="label">卖出触发价</div><div class="num-med up" id="sell-trigger">$--</div><div class="label-mute" id="sell-distance">--</div></div>
@@ -182,7 +206,7 @@
 
   <div class="body hide" id="tab-settings">
     <div>
-      <div class="section-h">信号类型 (改完立即生效)</div>
+      <div class="section-h"><span>信号类型 (改完立即生效)</span></div>
       <div class="card-flat">
         <div class="radio-row" onclick="updateSignalType('daily')"><div class="radio" id="r-daily"></div><span>每日变化 (vs 昨天)</span></div>
         <div class="radio-row" onclick="updateSignalType('weekly')"><div class="radio" id="r-weekly"></div><span>每周变化 (vs 5日均价)</span></div>
@@ -190,27 +214,30 @@
       </div>
     </div>
     <div>
-      <div class="section-h">触发阈值</div>
+      <div class="section-h"><span>触发阈值</span></div>
       <div class="card-flat">
         <div class="opt"><span class="name">跌幅触发买入</span><input type="number" id="i-drop" step="0.1" onchange="updateThreshold('drop', this.value)"><span style="margin-left: 4px;">%</span></div>
         <div class="opt"><span class="name">涨幅触发卖出</span><input type="number" id="i-rise" step="0.1" onchange="updateThreshold('rise', this.value)"><span style="margin-left: 4px;">%</span></div>
       </div>
     </div>
     <div>
-      <div class="section-h">交易金额</div>
+      <div class="section-h"><span>建议交易金额</span></div>
       <div class="card-flat">
         <div class="opt"><span class="name">每次买入</span><span style="margin-right: 4px;">$</span><input type="number" id="i-buy" onchange="updateTradeAmount('buy', this.value)"></div>
         <div class="opt"><span class="name">每次卖出</span><span style="margin-right: 4px;">$</span><input type="number" id="i-sell" onchange="updateTradeAmount('sell', this.value)"></div>
       </div>
     </div>
     <div class="label-mute" style="margin-top: 8px; line-height: 1.7;">
-      改动会自动同步到 GitHub config.yaml, 下次脚本运行就用新配置.
+      所有改动会同步到 GitHub config.yaml, 下次评估就用新配置. 你和 FP 共享这套设置.
     </div>
   </div>
 
   <div class="body hide" id="tab-history">
     <div>
-      <div class="section-h">持仓概况</div>
+      <div class="section-h">
+        <span>持仓概况 (你的)</span>
+        <span class="edit-link" onclick="openHoldingsEditor()">编辑 ✎</span>
+      </div>
       <div class="grid-2">
         <div class="metric"><div class="metric-l">总资产</div><div class="metric-v" id="m-total">$--</div></div>
         <div class="metric"><div class="metric-l">现有资产</div><div class="metric-v" id="m-current">$--</div></div>
@@ -221,22 +248,22 @@
       </div>
     </div>
     <div>
-      <div class="section-h">信号记录</div>
+      <div class="section-h"><span>信号记录 (你的操作)</span></div>
       <div id="signal-list" class="card-flat" style="padding: 4px 14px;"></div>
     </div>
   </div>
 
   <div class="body hide" id="tab-notify">
     <div>
-      <div class="section-h">接收人</div>
+      <div class="section-h"><span>接收人</span></div>
       <div class="card-flat" id="recipients-list"></div>
     </div>
     <div>
-      <div class="section-h">渠道</div>
+      <div class="section-h"><span>渠道</span></div>
       <div class="card-flat" id="channels-list"></div>
     </div>
     <div>
-      <div class="section-h">通知时段</div>
+      <div class="section-h"><span>通知时段</span></div>
       <div class="card-flat">
         <div class="opt"><span class="name">仅美股盘中</span><span class="label-mute">21:30 – 次日 04:00 (北京)</span></div>
       </div>
@@ -259,17 +286,27 @@
   </div>
 </div>
 
-<!-- 密码弹窗 -->
-<div id="modal-password" class="modal-overlay hide">
+<!-- 登录 modal: 选身份 + 输密码 -->
+<div id="modal-login" class="modal-overlay hide">
   <div class="modal">
-    <h2>输入密码</h2>
-    <p>第一次访问需要输入 dashboard 密码 (在 Cloudflare Worker 里设的 DASHBOARD_PASSWORD).</p>
+    <h2>选择身份</h2>
+    <p>谁在用这个 dashboard? 各自的持仓数据是分开的.</p>
+    <div class="user-picker">
+      <div class="opt-card" id="pick-wz" onclick="pickUser('wz')">
+        <div class="big">WZ</div>
+        <div class="label-mute" style="margin-top: 4px;">Wendi</div>
+      </div>
+      <div class="opt-card" id="pick-fp" onclick="pickUser('fp')">
+        <div class="big">FP</div>
+        <div class="label-mute" style="margin-top: 4px;">老公</div>
+      </div>
+    </div>
     <div class="form-row">
       <label>密码</label>
-      <input type="password" id="modal-password-input" autofocus>
+      <input type="password" id="login-password-input">
     </div>
     <div class="modal-actions">
-      <button class="btn btn-confirm" onclick="submitPassword()">确认</button>
+      <button class="btn btn-confirm" id="login-btn" onclick="submitLogin()">进入</button>
     </div>
   </div>
 </div>
@@ -281,15 +318,56 @@
     <p id="ack-summary">--</p>
     <div class="form-row">
       <label>实际成交股数</label>
-      <input type="number" id="ack-shares" step="0.01" min="0">
+      <input type="number" id="ack-shares" step="0.01" min="0" oninput="validateAckForm()">
     </div>
     <div class="form-row">
       <label>实际成交价</label>
       <input type="number" id="ack-price" step="0.01" min="0">
     </div>
+    <div class="warning hide" id="ack-warning"></div>
     <div class="modal-actions">
-      <button class="btn btn-cancel" onclick="closeAckDialog()">取消</button>
+      <button class="btn btn-cancel" onclick="closeModal('modal-ack')">取消</button>
       <button class="btn btn-confirm" id="ack-confirm-btn" onclick="confirmAck()">✓ 确认成交</button>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑持仓弹窗 -->
+<div id="modal-holdings" class="modal-overlay hide">
+  <div class="modal">
+    <h2>编辑持仓</h2>
+    <p>用于初始化或手动校准. 直接覆盖现有数字.</p>
+    <div class="form-row">
+      <label>持仓股数</label>
+      <input type="number" id="hd-shares" step="0.01" min="0">
+    </div>
+    <div class="form-row">
+      <label>平均成本 ($/股)</label>
+      <input type="number" id="hd-cost" step="0.01" min="0">
+    </div>
+    <div class="form-row">
+      <label>累计现金流 (Cash Flow, $)</label>
+      <input type="number" id="hd-cashflow" step="0.01">
+    </div>
+    <div class="form-row">
+      <label>已实现盈利 ($)</label>
+      <input type="number" id="hd-realized" step="0.01">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal('modal-holdings')">取消</button>
+      <button class="btn btn-confirm" id="holdings-confirm-btn" onclick="confirmHoldings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用确认 modal (撤销等) -->
+<div id="modal-confirm" class="modal-overlay hide">
+  <div class="modal">
+    <h2 id="confirm-title">确认</h2>
+    <p id="confirm-message">--</p>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal('modal-confirm')">取消</button>
+      <button class="btn btn-confirm" id="confirm-yes-btn">确认</button>
     </div>
   </div>
 </div>
