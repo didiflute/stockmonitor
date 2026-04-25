@@ -1,10 +1,8 @@
 // TQQQ 网格信号 PWA Dashboard
-// 配置: 修改下面的 GITHUB_USER 和 GITHUB_REPO 为你自己的仓库
-const GITHUB_USER = "didiflute";
-const GITHUB_REPO = "stockmonitor";
-const STATE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/state.json`;
-const CONFIG_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/config.yaml`;
-const HISTORY_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/state.json`;
+// state.json 和 config.yaml 由 deploy_pages.yml 复制到同目录, 直接读相对路径
+const STATE_URL = "./state.json";
+const CONFIG_URL = "./config.yaml";
+const HISTORY_URL = "./state.json";
 
 const STALE_MINUTES = 15; // 超过此时长的数据标记为过期
 
