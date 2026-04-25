@@ -34,4 +34,4 @@ notifications:
 
 # 通知时段 (默认仅美股盘中 = ET 9:30-16:00 = 北京 21:30-次日 04:00)
 quiet_hours:
-  market_only: false  # true 则只在美股盘中提醒
+  market_only: true  # true 则只在美股盘中提醒
