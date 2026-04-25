@@ -18,10 +18,15 @@
       "action": "sell",
       "price": 62.560001373291016,
       "fired_at": "2026-04-25T06:29:32.319575+00:00",
-      "user_acknowledged": false
+      "user_acknowledged": true,
+      "user_skipped": false,
+      "executed_shares": 7.99,
+      "executed_price": 62.56,
+      "executed_at": "2026-04-25T07:25:55.137Z"
     }
   ],
-  "holding_shares": 131.0,
+  "holding_shares": 123.01,
   "avg_cost": 48.37,
-  "cash_flow": 4962.0
+  "cash_flow": 4462.1456,
+  "realized_profit": 113.37810000000005
 }
