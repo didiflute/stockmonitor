@@ -5,7 +5,7 @@ ticker: TQQQ
 
 # 信号配置 (UI Tab "设置" 的字段)
 signal:
-  type: weekly        # daily | weekly | monthly
+  type: monthly        # daily | weekly | monthly
   drop_threshold: -0.07  # 跌幅触发买入 (负数, -0.07 = 跌 7%)
   rise_threshold: 0.08   # 涨幅触发卖出 (正数, 0.08 = 涨 8%)
 
