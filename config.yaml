@@ -1,37 +1,37 @@
-# TQQQ 网格交易信号 - 用户配置
-# 改完 commit 推到 GitHub, GitHub Actions 下次跑就用新配置
+# TQQQ ç½æ ¼äº¤æä¿¡å· - ç¨æ·éç½®
+# æ¹å® commit æ¨å° GitHub, GitHub Actions ä¸æ¬¡è·å°±ç¨æ°éç½®
 
 ticker: TQQQ
 
-# 信号配置 (UI Tab "设置" 的字段)
+# ä¿¡å·éç½® (UI Tab "è®¾ç½®" çå­æ®µ)
 signal:
-  type: monthly        # daily | weekly | monthly
-  drop_threshold: -0.07  # 跌幅触发买入 (负数, -0.07 = 跌 7%)
-  rise_threshold: 0.08   # 涨幅触发卖出 (正数, 0.08 = 涨 8%)
+  type: daily        # daily | weekly | monthly
+  drop_threshold: -0.07  # è·å¹è§¦åä¹°å¥ (è´æ°, -0.07 = è· 7%)
+  rise_threshold: 0.08   # æ¶¨å¹è§¦åååº (æ­£æ°, 0.08 = æ¶¨ 8%)
 
-# 交易金额 (用于 dashboard 估算每次该买/卖几股)
+# äº¤æéé¢ (ç¨äº dashboard ä¼°ç®æ¯æ¬¡è¯¥ä¹°/åå è¡)
 trade:
   buy_amount_usd: 500
   sell_amount_usd: 500
 
-# 通知渠道
+# éç¥æ¸ é
 notifications:
-  # 主通道: Pushover 手机推送 (iOS, 国内可用)
-  # 真正的 USER_KEY 走 GitHub Secrets (PUSHOVER_USER_WENDI, PUSHOVER_USER_HUSBAND)
+  # ä¸»éé: Pushover ææºæ¨é (iOS, å½åå¯ç¨)
+  # çæ­£ç USER_KEY èµ° GitHub Secrets (PUSHOVER_USER_WENDI, PUSHOVER_USER_HUSBAND)
   pushover:
     enabled: true
     recipients:
       - wendi
-      - husband   # 老公的 USER_KEY 配置在 secret PUSHOVER_USER_HUSBAND
+      - husband   # èå¬ç USER_KEY éç½®å¨ secret PUSHOVER_USER_HUSBAND
 
-  # 备份通道: 邮件 (Gmail SMTP, 真正的密码走 secret GMAIL_APP_PASSWORD)
-  # 万一 Pushover 推送没收到, 邮箱里也有底
+  # å¤ä»½éé: é®ä»¶ (Gmail SMTP, çæ­£çå¯ç èµ° secret GMAIL_APP_PASSWORD)
+  # ä¸ä¸ Pushover æ¨éæ²¡æ¶å°, é®ç®±éä¹æåº
   email:
     enabled: true
     to:
       - wendizeng11@gmail.com
       - pengfukang@gmail.com
 
-# 通知时段 (默认仅美股盘中 = ET 9:30-16:00 = 北京 21:30-次日 04:00)
+# éç¥æ¶æ®µ (é»è®¤ä»ç¾è¡çä¸­ = ET 9:30-16:00 = åäº¬ 21:30-æ¬¡æ¥ 04:00)
 quiet_hours:
-  market_only: true  # true 则只在美股盘中提醒
+  market_only: true  # true ååªå¨ç¾è¡çä¸­æé
