@@ -29,5 +29,15 @@
   "holding_shares": 115.02000000000001,
   "avg_cost": 48.37,
   "cash_flow": 3962.2911999999997,
-  "realized_profit": 226.7562000000001
+  "realized_profit": 226.7562000000001,
+  "users": {
+    "wz": {
+      "holding_shares": 114.601,
+      "avg_cost": 24.08,
+      "cash_flow": 2759.89,
+      "realized_profit": 0,
+      "acks": [],
+      "skips": []
+    }
+  }
 }
