@@ -33,8 +33,8 @@
   "users": {
     "wz": {
       "holding_shares": 114.601,
-      "avg_cost": 0,
-      "cash_flow": 0,
+      "avg_cost": 24.08,
+      "cash_flow": 2759.89,
       "realized_profit": 0,
       "acks": [],
       "skips": []
