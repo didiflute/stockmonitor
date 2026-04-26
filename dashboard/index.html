@@ -239,12 +239,12 @@
         <span class="edit-link" onclick="openHoldingsEditor()">编辑 ✎</span>
       </div>
       <div class="grid-2">
-        <div class="metric"><div class="metric-l">总资产</div><div class="metric-v" id="m-total">$--</div></div>
-        <div class="metric"><div class="metric-l">现有资产</div><div class="metric-v" id="m-current">$--</div></div>
+        <div class="metric"><div class="metric-l">总资产 (本金)</div><div class="metric-v" id="m-total">$--</div></div>
+        <div class="metric"><div class="metric-l">现有资产 (市值)</div><div class="metric-v" id="m-current">$--</div></div>
         <div class="metric"><div class="metric-l">Avg Cost</div><div class="metric-v" id="m-avgcost">$--</div></div>
         <div class="metric"><div class="metric-l">Current Price</div><div class="metric-v" id="m-price">$--</div></div>
+        <div class="metric"><div class="metric-l">浮动盈亏</div><div class="metric-v" id="m-unrealized">$--</div></div>
         <div class="metric"><div class="metric-l">已实现盈利</div><div class="metric-v up" id="m-realized">$--</div></div>
-        <div class="metric"><div class="metric-l">Cash Flow</div><div class="metric-v" id="m-cashflow">$--</div></div>
       </div>
     </div>
     <div>
@@ -346,11 +346,7 @@
       <input type="number" id="hd-cost" step="0.01" min="0">
     </div>
     <div class="form-row">
-      <label>累计现金流 (Cash Flow, $)</label>
-      <input type="number" id="hd-cashflow" step="0.01">
-    </div>
-    <div class="form-row">
-      <label>已实现盈利 ($)</label>
+      <label>已实现盈利 ($) — 累计从过去卖出实际赚到手的, 没卖过填 0</label>
       <input type="number" id="hd-realized" step="0.01">
     </div>
     <div class="modal-actions">

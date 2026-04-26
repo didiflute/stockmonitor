@@ -373,16 +373,19 @@ function renderHistory() {
   const shares = me.holding_shares || 0;
   const price = q.price || 0;
   const cost = me.avg_cost || 0;
-  const cashflow = me.cash_flow || 0;
   const realized = me.realized_profit || 0;
-  const currentValue = shares * price;
-  const totalAssets = currentValue + realized;
+  const totalAssets = shares * cost;        // 总资产 = cost basis (你投入的本金)
+  const currentValue = shares * price;       // 现有资产 = 市值
+  const unrealized = currentValue - totalAssets;  // 浮动盈亏
 
+  document.getElementById("m-total").textContent = fmtUsd(totalAssets, 0);
   document.getElementById("m-current").textContent = fmtUsd(currentValue, 0);
   document.getElementById("m-avgcost").textContent = fmtUsd(cost);
   document.getElementById("m-price").textContent = fmtUsd(price);
-  document.getElementById("m-cashflow").textContent = fmtUsd(cashflow, 0);
-  document.getElementById("m-total").textContent = fmtUsd(totalAssets, 0);
+  document.getElementById("m-unrealized").textContent = (unrealized >= 0 ? "+" : "") + fmtUsd(unrealized, 0);
+  const unrealizedEl = document.getElementById("m-unrealized");
+  unrealizedEl.classList.toggle("up", unrealized >= 0);
+  unrealizedEl.classList.toggle("down", unrealized < 0);
   document.getElementById("m-realized").textContent = (realized >= 0 ? "+" : "") + fmtUsd(realized, 0);
 
   // 信号记录: 把所有 fired_signals 跟我的 acks/skips 合并显示
@@ -610,16 +613,18 @@ function openHoldingsEditor() {
   const me = getMe();
   document.getElementById("hd-shares").value = me.holding_shares || 0;
   document.getElementById("hd-cost").value = me.avg_cost || 0;
-  document.getElementById("hd-cashflow").value = me.cash_flow || 0;
   document.getElementById("hd-realized").value = me.realized_profit || 0;
   document.getElementById("modal-holdings").classList.remove("hide");
 }
 
 async function confirmHoldings() {
+  const shares = parseFloat(document.getElementById("hd-shares").value);
+  const cost = parseFloat(document.getElementById("hd-cost").value);
   const payload = {
-    holding_shares: parseFloat(document.getElementById("hd-shares").value),
-    avg_cost: parseFloat(document.getElementById("hd-cost").value),
-    cash_flow: parseFloat(document.getElementById("hd-cashflow").value),
+    holding_shares: shares,
+    avg_cost: cost,
+    // cash_flow 用本金值 (= shares × cost), 让 worker 内部记账起点正确
+    cash_flow: shares * cost,
     realized_profit: parseFloat(document.getElementById("hd-realized").value),
   };
   const btn = document.getElementById("holdings-confirm-btn");
