@@ -378,10 +378,10 @@ function renderHistory() {
   const currentValue = shares * price;       // 现有资产 = 市值
   const unrealized = currentValue - totalAssets;  // 浮动盈亏
 
+  document.getElementById("m-shares").textContent = shares.toFixed(2) + " 股";
+  document.getElementById("m-avgcost").textContent = fmtUsd(cost);
   document.getElementById("m-total").textContent = fmtUsd(totalAssets, 0);
   document.getElementById("m-current").textContent = fmtUsd(currentValue, 0);
-  document.getElementById("m-avgcost").textContent = fmtUsd(cost);
-  document.getElementById("m-price").textContent = fmtUsd(price);
   document.getElementById("m-unrealized").textContent = (unrealized >= 0 ? "+" : "") + fmtUsd(unrealized, 0);
   const unrealizedEl = document.getElementById("m-unrealized");
   unrealizedEl.classList.toggle("up", unrealized >= 0);
