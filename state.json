@@ -39,11 +39,27 @@
   ],
   "users": {
     "wz": {
-      "holding_shares": 114.601,
+      "holding_shares": 101.616,
       "avg_cost": 24.08,
-      "cash_flow": 2759.89,
-      "realized_profit": 0,
-      "acks": [],
+      "cash_flow": 1950.27525,
+      "realized_profit": 496.93595,
+      "acks": [
+        {
+          "signal_id": "2026-04-28_monthly_sell",
+          "date": "2026-04-28",
+          "signal_type": "monthly",
+          "action": "sell",
+          "executed_shares": 12.985,
+          "executed_price": 62.35,
+          "acknowledged_at": "2026-04-28T04:26:38.064Z",
+          "delta": {
+            "delta_shares": -12.985,
+            "delta_total_cost": -312.67879999999997,
+            "delta_cash_flow": -809.61475,
+            "delta_realized": 496.93595
+          }
+        }
+      ],
       "skips": []
     }
   }
