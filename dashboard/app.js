@@ -726,6 +726,17 @@ async function reloadAll() {
 // ---------------- 初始化 ----------------
 
 async function init() {
+  // 注册 Service Worker (Network First 策略, 防止 iOS PWA 顽固缓存)
+  if ("serviceWorker" in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.register("./sw.js");
+      // 检查是否有新版本可用
+      reg.update();
+    } catch (e) {
+      console.warn("SW register failed:", e);
+    }
+  }
+
   updateUserAvatar();
   if (!currentUserId || !dashboardPassword) {
     promptLogin();
@@ -739,5 +750,14 @@ async function init() {
     if (activeTab === "today") renderToday();
     else if (activeTab === "history") renderHistory();
   }, AUTO_REFRESH_SECONDS * 1000);
+
+  // PWA 重新获得焦点时立即刷新 (iOS 后台会暂停 setInterval)
+  document.addEventListener("visibilitychange", async () => {
+    if (!document.hidden && currentUserId && dashboardPassword) {
+      await fetchState();
+      const activeTab = document.querySelector(".tab-item.active")?.dataset.tab || "today";
+      switchTab(activeTab);
+    }
+  });
 }
 init();
