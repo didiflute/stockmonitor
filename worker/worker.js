@@ -196,6 +196,21 @@ async function handleAck(body, userId, env) {
     return jsonResp({ ok: true, message: "already acknowledged", state });
   }
 
+  // 确保 fired_signals 有对应条目 (后端可能还没跑到, 但用户已经看到 alert 并下单)
+  if (!state.fired_signals) state.fired_signals = [];
+  const firedExists = state.fired_signals.find(
+    (s) => s.date === date && s.signal_type === signal_type && s.action === action
+  );
+  if (!firedExists) {
+    state.fired_signals.push({
+      date,
+      signal_type,
+      action,
+      price: Number(price),
+      fired_at: new Date().toISOString(),
+    });
+  }
+
   // 移除 skip 标记 (如果之前跳过了, 现在改主意要 ack)
   user.skips = user.skips.filter((s) => s.signal_id !== sigId);
 
@@ -260,6 +275,22 @@ async function handleSkip(body, userId, env) {
   if (user.skips.find((s) => s.signal_id === sigId)) {
     return jsonResp({ ok: true, message: "already skipped" });
   }
+
+  // 确保 fired_signals 有对应条目
+  if (!state.fired_signals) state.fired_signals = [];
+  const firedExists = state.fired_signals.find(
+    (s) => s.date === date && s.signal_type === signal_type && s.action === action
+  );
+  if (!firedExists) {
+    state.fired_signals.push({
+      date,
+      signal_type,
+      action,
+      price: state.last_quote?.price || 0,
+      fired_at: new Date().toISOString(),
+    });
+  }
+
   user.skips.push({
     signal_id: sigId,
     date,
@@ -342,6 +373,10 @@ function patchConfigYaml(yamlText, updates) {
   if (updates.sell_amount_usd !== undefined) {
     out = out.replace(/(\n\s*sell_amount_usd:\s*)(\d+(?:\.\d+)?)(\s*(?:#.*)?\n)/,
       `$1${updates.sell_amount_usd}$3`);
+  }
+  if (updates.market_only !== undefined) {
+    out = out.replace(/(\n\s*market_only:\s*)(true|false)(\s*(?:#.*)?\n)/,
+      `$1${updates.market_only}$3`);
   }
   return out;
 }
