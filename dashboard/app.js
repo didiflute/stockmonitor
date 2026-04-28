@@ -526,6 +526,16 @@ function validateAckForm() {
   btn.disabled = false;
 }
 
+// 用 Worker 返回的最新 state 直接更新本地, 避免去 raw URL 拉到老缓存
+function applyServerState(newState) {
+  if (newState) {
+    state = newState;
+    const activeTab = document.querySelector(".tab-item.active")?.dataset.tab || "today";
+    if (activeTab === "today") renderToday();
+    else if (activeTab === "history") renderHistory();
+  }
+}
+
 async function confirmAck() {
   const sig = currentSignalForAck;
   if (!sig) return;
@@ -539,13 +549,13 @@ async function confirmAck() {
   btn.disabled = true;
   btn.textContent = "提交中...";
   try {
-    await callWorker("/api/ack", {
+    const r = await callWorker("/api/ack", {
       date: sig.date, signal_type: sig.signal_type, action: sig.action,
       shares, price,
     });
     closeModal("modal-ack");
     showToast("已成交, 持仓已更新");
-    setTimeout(reloadAll, 1200);
+    applyServerState(r.state);
   } catch (e) {
     showToast("失败: " + e.message);
   } finally {
@@ -562,11 +572,11 @@ async function skipSignal() {
     "今天不再提醒你这条信号. 之后如果想反悔, 在历史 Tab 点 ↺ 撤销.",
     async () => {
       try {
-        await callWorker("/api/skip", {
+        const r = await callWorker("/api/skip", {
           date: sig.date, signal_type: sig.signal_type, action: sig.action,
         });
         showToast("已跳过");
-        setTimeout(reloadAll, 1000);
+        applyServerState(r.state);
       } catch (e) {
         showToast("失败: " + e.message);
       }
@@ -582,9 +592,9 @@ async function undoAck(date, signal_type, action) {
     `这会把持仓恢复到下单前的状态. 确认撤销?`,
     async () => {
       try {
-        await callWorker("/api/undo-ack", { date, signal_type, action });
+        const r = await callWorker("/api/undo-ack", { date, signal_type, action });
         showToast("已撤销");
-        setTimeout(reloadAll, 1000);
+        applyServerState(r.state);
       } catch (e) {
         showToast("失败: " + e.message);
       }
@@ -598,9 +608,9 @@ async function undoSkip(date, signal_type, action) {
     "这条信号会重新出现在今日 Tab.",
     async () => {
       try {
-        await callWorker("/api/undo-skip", { date, signal_type, action });
+        const r = await callWorker("/api/undo-skip", { date, signal_type, action });
         showToast("已撤销");
-        setTimeout(reloadAll, 1000);
+        applyServerState(r.state);
       } catch (e) {
         showToast("失败: " + e.message);
       }
@@ -632,10 +642,10 @@ async function confirmHoldings() {
   btn.disabled = true;
   btn.textContent = "保存中...";
   try {
-    await callWorker("/api/set-holdings", payload);
+    const r = await callWorker("/api/set-holdings", payload);
     closeModal("modal-holdings");
     showToast("持仓已更新");
-    setTimeout(reloadAll, 1200);
+    applyServerState(r.state);
   } catch (e) {
     showToast("失败: " + e.message);
   } finally {
@@ -653,7 +663,7 @@ async function updateSignalType(t) {
   try {
     await callWorker("/api/config", { signal_type: t });
     showToast(`信号类型改为 ${{ daily: "每日", weekly: "每周", monthly: "每月" }[t]}`);
-    setTimeout(reloadAll, 1500);
+    // 不重新拉服务器: raw URL CDN 缓存延迟会让 UI 倒退. 信任本地状态, 60s 自动刷新会兜底
   } catch (e) {
     showToast("失败: " + e.message);
   }
@@ -666,8 +676,9 @@ async function updateThreshold(which, val) {
   const value = which === "drop" ? -Math.abs(num) / 100 : Math.abs(num) / 100;
   try {
     await callWorker("/api/config", { [key]: value });
+    // 同步本地 config (避免之后被 raw URL 缓存覆盖)
+    if (config && config.signal) config.signal[key] = value;
     showToast(`${which === "drop" ? "买入跌幅" : "卖出涨幅"}阈值已更新`);
-    setTimeout(fetchConfig, 1500);
   } catch (e) {
     showToast("失败: " + e.message);
   }
@@ -679,8 +690,8 @@ async function updateTradeAmount(which, val) {
   const key = which === "buy" ? "buy_amount_usd" : "sell_amount_usd";
   try {
     await callWorker("/api/config", { [key]: num });
+    if (config && config.trade) config.trade[key] = num;
     showToast(`${which === "buy" ? "买入" : "卖出"}金额改为 $${num}`);
-    setTimeout(fetchConfig, 1500);
   } catch (e) {
     showToast("失败: " + e.message);
   }
