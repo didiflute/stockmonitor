@@ -690,11 +690,13 @@ async function updateTradeAmount(which, val) {
 async function manualRefresh() {
   const btn = document.getElementById("refresh-btn");
   btn.classList.add("spin");
-  showToast("已触发后端, 等待 30-60 秒...", 4000);
+  showToast("已触发后端, 整个链路约 2-5 分钟...", 5000);
   try {
     await callWorker("/api/refresh", {});
     const oldTime = state?.last_run_at;
     let tries = 0;
+    const MAX_TRIES = 60;       // 60 × 10s = 10 分钟超时
+    const INTERVAL = 10000;     // 每 10 秒查一次
     const poll = setInterval(async () => {
       tries++;
       await fetchState();
@@ -703,12 +705,16 @@ async function manualRefresh() {
         btn.classList.remove("spin");
         renderToday();
         showToast("数据已更新 ✓");
-      } else if (tries >= 18) {
+      } else if (tries >= MAX_TRIES) {
         clearInterval(poll);
         btn.classList.remove("spin");
-        showToast("等待超时, 请稍后再试");
+        showToast("超过 10 分钟没等到更新, 可能后端排队了。下次自动刷新会带上新数据", 4000);
+      } else if (tries % 6 === 0) {
+        // 每 1 分钟更新一次进度提示
+        const minutes = Math.floor((tries * INTERVAL) / 60000);
+        showToast(`等待中... (已等 ${minutes} 分钟, 链路最长 5 分钟左右)`, 3000);
       }
-    }, 5000);
+    }, INTERVAL);
   } catch (e) {
     btn.classList.remove("spin");
     showToast("刷新失败: " + e.message);
