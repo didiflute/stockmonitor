@@ -6,8 +6,9 @@
 
 const WORKER_URL = "https://stockmonitor.wendizeng11.workers.dev";
 
-const STATE_URL = "./state.json";
-const CONFIG_URL = "./config.yaml";
+// 直接从 GitHub 仓库读, 跳过 Pages 重新部署 - 数据更新更快 (省 2-4 分钟)
+const STATE_URL = "https://raw.githubusercontent.com/didiflute/stockmonitor/main/state.json";
+const CONFIG_URL = "https://raw.githubusercontent.com/didiflute/stockmonitor/main/config.yaml";
 const STALE_MINUTES = 15;
 const AUTO_REFRESH_SECONDS = 60;
 const USER_NAMES = { wz: "Wendi", fp: "老公" };
