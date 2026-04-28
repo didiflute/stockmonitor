@@ -271,6 +271,8 @@ function renderToday() {
   const me = getMe();
   const q = state.last_quote || {};
   const sigType = config.signal.type;
+  const evalSigType = q.signal_type;
+  const isStale = evalSigType && evalSigType !== sigType;  // 配置和评估时类型不匹配
   document.getElementById("signal-type-pill").textContent =
     { daily: "每日", weekly: "每周", monthly: "每月" }[sigType] + " 信号";
 
@@ -288,30 +290,65 @@ function renderToday() {
 
   document.getElementById("current-price").textContent = fmtUsd(price);
   const dayChangeEl = document.getElementById("day-change");
-  if (q.change_rate !== undefined) {
+  if (isStale) {
+    dayChangeEl.textContent = "评估中...";
+    dayChangeEl.classList.remove("up", "down");
+  } else if (q.change_rate !== undefined) {
     const sign = q.change_rate >= 0 ? "↑ " : "↓ ";
     dayChangeEl.textContent = sign + fmtPct(Math.abs(q.change_rate));
     dayChangeEl.classList.toggle("up", q.change_rate >= 0);
     dayChangeEl.classList.toggle("down", q.change_rate < 0);
   }
 
-  document.getElementById("buy-trigger").textContent = fmtUsd(q.buy_trigger_price);
-  document.getElementById("sell-trigger").textContent = fmtUsd(q.sell_trigger_price);
-  if (q.buy_trigger_price && price) {
-    const dist = (price - q.buy_trigger_price) / price * 100;
-    document.getElementById("buy-distance").textContent = `还需跌 ${dist.toFixed(1)}%`;
-  }
-  if (q.sell_trigger_price && price) {
-    const dist = (q.sell_trigger_price - price) / price * 100;
-    document.getElementById("sell-distance").textContent =
-      dist >= 0 ? `还需涨 ${dist.toFixed(1)}%` : `已超 ${(-dist).toFixed(1)}%`;
-  }
-  document.getElementById("forecast-note").textContent =
-    `明天 TQQQ 若跌到 ${fmtUsd(q.buy_trigger_price)} 触发买入, 涨到 ${fmtUsd(q.sell_trigger_price)} 触发卖出.`;
+  // 三种信号变化率小卡 (当前选中的高亮)
+  ["daily", "weekly", "monthly"].forEach(t => {
+    const block = document.getElementById(`rate-${t}`);
+    block.classList.toggle("active", t === sigType);
+    const valueEl = document.getElementById(`rate-val-${t}`);
+    const rate = q.all_rates?.[t];
+    if (rate === undefined || rate === null) {
+      valueEl.textContent = (t === sigType && q.change_rate !== undefined)
+        ? ((q.change_rate >= 0 ? "+" : "") + (q.change_rate * 100).toFixed(2) + "%")
+        : "--";
+    } else {
+      valueEl.textContent = (rate >= 0 ? "+" : "") + (rate * 100).toFixed(2) + "%";
+    }
+    valueEl.classList.remove("up", "down");
+    if (rate !== undefined && rate !== null) {
+      valueEl.classList.toggle("up", rate > 0);
+      valueEl.classList.toggle("down", rate < 0);
+    }
+  });
 
-  // 信号警告卡: 当前用户是否未操作?
+  if (isStale) {
+    // 类型不匹配, 触发价不可信, 显示"评估中"
+    document.getElementById("buy-trigger").textContent = "—";
+    document.getElementById("sell-trigger").textContent = "—";
+    document.getElementById("buy-distance").textContent = "";
+    document.getElementById("sell-distance").textContent = "";
+    document.getElementById("forecast-note").textContent =
+      `信号类型改了, 后端正在重新评估 (30 秒 - 5 分钟). 数据自动更新, 不用手动操作.`;
+  } else {
+    document.getElementById("buy-trigger").textContent = fmtUsd(q.buy_trigger_price);
+    document.getElementById("sell-trigger").textContent = fmtUsd(q.sell_trigger_price);
+    if (q.buy_trigger_price && price) {
+      const dist = (price - q.buy_trigger_price) / price * 100;
+      document.getElementById("buy-distance").textContent = `还需跌 ${dist.toFixed(1)}%`;
+    }
+    if (q.sell_trigger_price && price) {
+      const dist = (q.sell_trigger_price - price) / price * 100;
+      document.getElementById("sell-distance").textContent =
+        dist >= 0 ? `还需涨 ${dist.toFixed(1)}%` : `已超 ${(-dist).toFixed(1)}%`;
+    }
+    document.getElementById("forecast-note").textContent =
+      `明天 TQQQ 若跌到 ${fmtUsd(q.buy_trigger_price)} 触发买入, 涨到 ${fmtUsd(q.sell_trigger_price)} 触发卖出.`;
+  }
+
+  // 信号警告卡: 类型不匹配时直接隐藏 (避免显示旧类型的误导信号)
   const alertCard = document.getElementById("alert-card");
-  if (q.action === "buy" || q.action === "sell") {
+  if (isStale) {
+    alertCard.classList.add("hide");
+  } else if (q.action === "buy" || q.action === "sell") {
     const today = new Date().toISOString().slice(0, 10);
     const sid = signalId(today, sigType, q.action);
     const acked = (me.acks || []).find(a => a.signal_id === sid);
@@ -470,6 +507,45 @@ function renderNotify() {
     row.innerHTML = `<div><div>${c.label}</div><div class="label-mute">${c.desc}</div></div><span class="label-mute">${c.enabled ? "开启" : "关闭"}</span>`;
     chList.appendChild(row);
   });
+
+  // 通知时段开关 + 本地时间显示
+  const marketOnly = config.quiet_hours?.market_only !== false;  // 默认 true
+  document.getElementById("switch-market-only").classList.toggle("on", marketOnly);
+  document.getElementById("market-hours-display").textContent =
+    "美股盘中 = " + getLocalMarketHoursLabel();
+}
+
+function getLocalMarketHoursLabel() {
+  // 美股 9:30-16:00 ET, EDT 时段 = 13:30-20:00 UTC
+  // 用今天日期生成开盘/收盘时刻, 转成手机本地时区显示
+  const today = new Date();
+  const open = new Date(Date.UTC(
+    today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 13, 30
+  ));
+  const close = new Date(Date.UTC(
+    today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 20, 0
+  ));
+  const fmt = d => d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+  // 收盘可能跨天 (东亚时区)
+  const crossDay = open.getDate() !== close.getDate() || close.getDate() !== today.getDate();
+  return `${fmt(open)} – ${fmt(close)}${crossDay ? " (次日)" : ""}`;
+}
+
+async function toggleMarketOnly() {
+  if (!config) return;
+  if (!config.quiet_hours) config.quiet_hours = {};
+  const newVal = !(config.quiet_hours.market_only !== false);
+  config.quiet_hours.market_only = newVal;
+  document.getElementById("switch-market-only").classList.toggle("on", newVal);
+  try {
+    await callWorker("/api/config", { market_only: newVal });
+    showToast(`仅美股盘中: ${newVal ? "已开启" : "已关闭"}`);
+  } catch (e) {
+    showToast("失败: " + e.message);
+    // 失败回滚 UI
+    config.quiet_hours.market_only = !newVal;
+    document.getElementById("switch-market-only").classList.toggle("on", !newVal);
+  }
 }
 
 // ---------------- Tab 切换 ----------------
@@ -660,10 +736,13 @@ async function updateSignalType(t) {
   if (!config) return;
   config.signal.type = t;
   renderSettings();
+  // 立即重新渲染今日 Tab 让用户看到 "评估中..." (避免新类型 vs 老 last_quote 数据不匹配)
+  if (state) renderToday();
   try {
     await callWorker("/api/config", { signal_type: t });
-    showToast(`信号类型改为 ${{ daily: "每日", weekly: "每周", monthly: "每月" }[t]}`);
-    // 不重新拉服务器: raw URL CDN 缓存延迟会让 UI 倒退. 信任本地状态, 60s 自动刷新会兜底
+    showToast(`信号类型改为 ${{ daily: "每日", weekly: "每周", monthly: "每月" }[t]}, 后端重新评估中...`);
+    // 自动触发后端重新评估 (新类型 → 新 change_rate / trigger 价)
+    callWorker("/api/refresh", {}).catch(() => {});  // fire-and-forget
   } catch (e) {
     showToast("失败: " + e.message);
   }
