@@ -16,6 +16,7 @@ import logging
 import yaml
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -118,68 +119,109 @@ def main():
     now_utc = datetime.now(timezone.utc)
     now_et = now_utc.astimezone(ET)
 
-    # 1. 通知时段检查
+    # 1. 通知时段判断 (注意: 现在永远评估, 只有 NOTIFY 受这个限制)
     market_only = cfg.get("quiet_hours", {}).get("market_only", True)
     market_open = is_market_open(now_utc)
-    if market_only and not market_open:
-        log.info(f"美股未开盘 (北京 {now_utc.astimezone(ZoneInfo('Asia/Shanghai')).strftime('%H:%M')}), 跳过本次")
-        # 仍然更新 state.last_run_at 让 dashboard 知道脚本在跑
-        save_state(state)
-        return
+    can_notify = market_open or not market_only
 
     # 2. 拉价格
     log.info(f"开始拉取 {cfg['ticker']} 价格...")
     quote = fetch_current_price(cfg["ticker"])
     log.info(f"当前价: ${quote.price:.2f} (来源: {quote.source})")
 
-    # 3. 拉历史
+    # 3. 拉历史 (取 25 天足够算所有 3 种信号)
+    historical = fetch_historical_closes(cfg["ticker"], days=25)
+    log.info(f"历史 {len(historical)} 天")
+
+    # 4. 评估三种信号类型 (dashboard 三个 block 都要)
+    drop_t = cfg["signal"]["drop_threshold"]
+    rise_t = cfg["signal"]["rise_threshold"]
+    all_results: dict[str, Any] = {}
+    for st in ("daily", "weekly", "monthly"):
+        st_typed: SignalType = st  # type: ignore
+        try:
+            r = evaluate_signal(
+                current_price=quote.price,
+                historical_closes=historical,
+                signal_type=st_typed,
+                drop_threshold=drop_t,
+                rise_threshold=rise_t,
+            )
+            all_results[st] = {
+                "change_rate": r.change_rate,
+                "action": r.action,
+                "buy_trigger_price": r.buy_trigger_price,
+                "sell_trigger_price": r.sell_trigger_price,
+                "reference_price": r.reference_price,
+            }
+        except ValueError:
+            pass
+
+    # 主信号 (用户配置的那个)
     sig_type: SignalType = cfg["signal"]["type"]
-    needed = WINDOW_BY_TYPE[sig_type]
-    historical = fetch_historical_closes(cfg["ticker"], days=max(needed + 5, 25))
-    log.info(f"历史 {len(historical)} 天: 最近 5 天 {[f'${c:.2f}' for c in historical[:5]]}")
+    main_result = all_results.get(sig_type)
+    if main_result is None:
+        log.error(f"无法评估主信号 {sig_type}, 历史不够")
+        save_state(state)
+        return
 
-    # 4. 评估
-    result = evaluate_signal(
-        current_price=quote.price,
-        historical_closes=historical,
-        signal_type=sig_type,
-        drop_threshold=cfg["signal"]["drop_threshold"],
-        rise_threshold=cfg["signal"]["rise_threshold"],
+    log.info(
+        f"信号 [{sig_type}]: {main_result['action']} "
+        f"(变化率 {main_result['change_rate']:+.2%})"
     )
-    log.info(f"信号: {result.action} (变化率 {result.change_rate:+.2%}, 参考价 ${result.reference_price:.2f})")
 
-    # 5. 状态快照 (即使没触发, dashboard 也要看)
+    # 5. 状态快照 (last_quote 含主信号 + 三种类型变化率)
     state.last_quote = {
         "price": quote.price,
         "timestamp": quote.timestamp,
         "source": quote.source,
         "signal_type": sig_type,
-        "change_rate": result.change_rate,
-        "action": result.action,
-        "buy_trigger_price": result.buy_trigger_price,
-        "sell_trigger_price": result.sell_trigger_price,
-        "reference_price": result.reference_price,
+        "change_rate": main_result["change_rate"],
+        "action": main_result["action"],
+        "buy_trigger_price": main_result["buy_trigger_price"],
+        "sell_trigger_price": main_result["sell_trigger_price"],
+        "reference_price": main_result["reference_price"],
+        "all_rates": {st: r["change_rate"] for st, r in all_results.items()},
+        "all_actions": {st: r["action"] for st, r in all_results.items()},
     }
 
-    # 6. 触发 + 未通知过 -> 发通知
+    # 6. 主信号触发 + 未通知过 -> mark_fired (始终), 通知 (仅在允许时段)
     today_et = now_et.strftime("%Y-%m-%d")
-    if result.is_triggered:
-        if state.is_already_fired_today(today_et, sig_type, result.action):
-            log.info(f"今天已通知过 {sig_type}-{result.action}, 跳过 (防重复)")
+    main_action = main_result["action"]
+    if main_action in ("buy", "sell"):
+        if state.is_already_fired_today(today_et, sig_type, main_action):
+            log.info(f"今天已记录过 {sig_type}-{main_action}, 跳过")
         else:
-            log.info("发送通知...")
-            msg = format_signal_message(cfg, quote.price, result, now_et)
-            notify_cfg = build_notification_config(cfg)
-            send_results = notify_all(msg, notify_cfg)
-            log.info(f"通知结果: {send_results}")
-
+            # 记录 fired_signal (即使在静默时段, 也保留历史)
             state.mark_fired(FiredSignal(
                 date=today_et,
                 signal_type=sig_type,
-                action=result.action,
+                action=main_action,
                 price=quote.price,
                 fired_at=now_utc.isoformat(),
             ))
+            log.info(f"已记录信号到 fired_signals (date={today_et})")
+
+            # 仅在通知时段才推送
+            if can_notify:
+                log.info("发送通知...")
+                # 构造一个临时的 result 对象用于消息生成
+                from grid_signal import SignalResult
+                msg_result = SignalResult(
+                    signal_type=sig_type,
+                    current_price=quote.price,
+                    reference_price=main_result["reference_price"],
+                    change_rate=main_result["change_rate"],
+                    action=main_action,  # type: ignore
+                    drop_threshold=drop_t,
+                    rise_threshold=rise_t,
+                )
+                msg = format_signal_message(cfg, quote.price, msg_result, now_et)
+                notify_cfg = build_notification_config(cfg)
+                send_results = notify_all(msg, notify_cfg)
+                log.info(f"通知结果: {send_results}")
+            else:
+                log.info(f"非通知时段 (market_only=true 且非盘中), 跳过推送 (信号已记入历史)")
 
     # 7. 写回 state
     save_state(state)
