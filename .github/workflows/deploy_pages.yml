@@ -1,11 +1,12 @@
 name: Deploy Dashboard to GitHub Pages
 
 on:
+  # 只在 dashboard / config.yaml 改动时部署 (state.json 走 raw URL 直接读, 不再触发 Pages 重新部署)
   push:
     branches: [main]
     paths:
       - 'dashboard/**'
-      - 'state.json'
+      - 'config.yaml'
   workflow_dispatch:
 
 permissions:
@@ -26,6 +27,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 准备发布目录: 把 dashboard 文件 + state.json/config.yaml 都复制进去
+      # 这样 dashboard 就不用走 raw.githubusercontent.com, 直接读相对路径, 速度更快
       - name: Prepare publish folder
         run: |
           mkdir -p _site
