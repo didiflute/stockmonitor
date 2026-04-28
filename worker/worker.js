@@ -42,12 +42,19 @@ async function ghGetFile(env, path) {
   );
   if (!r.ok) throw new Error(`GitHub GET ${path} failed: ${r.status}`);
   const data = await r.json();
-  const content = atob(data.content.replace(/\s/g, ""));
+  // base64 -> bytes -> UTF-8 string (正确处理中文等多字节字符)
+  const cleanedB64 = data.content.replace(/\s/g, "");
+  const bytes = Uint8Array.from(atob(cleanedB64), c => c.charCodeAt(0));
+  const content = new TextDecoder("utf-8").decode(bytes);
   return { sha: data.sha, content };
 }
 
 async function ghPutFile(env, path, newContent, sha, message) {
-  const b64 = btoa(unescape(encodeURIComponent(newContent)));
+  // UTF-8 string -> bytes -> base64 (正确处理中文等多字节字符)
+  const utf8bytes = new TextEncoder().encode(newContent);
+  let binary = "";
+  utf8bytes.forEach(b => binary += String.fromCharCode(b));
+  const b64 = btoa(binary);
   const r = await fetch(
     `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`,
     {
