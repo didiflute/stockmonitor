@@ -6,9 +6,12 @@
 
 const WORKER_URL = "https://stockmonitor.wendizeng11.workers.dev";
 
-// 直接从 GitHub 仓库读, 跳过 Pages 重新部署 - 数据更新更快 (省 2-4 分钟)
-const STATE_URL = "https://raw.githubusercontent.com/didiflute/stockmonitor/main/state.json";
-const CONFIG_URL = "https://raw.githubusercontent.com/didiflute/stockmonitor/main/config.yaml";
+// 通过 Worker /api/data 读取 (绕过 raw URL 的 5 分钟 CDN 缓存)
+// Worker 直接走 GitHub API, 永远拿最新版
+const DATA_URL = WORKER_URL + "/api/data";
+// 备用: 如果 Worker 挂了直接走 raw URL
+const STATE_URL_FALLBACK = "https://raw.githubusercontent.com/didiflute/stockmonitor/main/state.json";
+const CONFIG_URL_FALLBACK = "https://raw.githubusercontent.com/didiflute/stockmonitor/main/config.yaml";
 const STALE_MINUTES = 15;
 const AUTO_REFRESH_SECONDS = 60;
 const USER_NAMES = { wz: "Wendi", fp: "老公" };
@@ -195,9 +198,30 @@ document.addEventListener("keydown", (e) => {
 
 // ---------------- 数据加载 ----------------
 
+// 主路径: Worker 代理 (绕过 raw URL CDN 缓存); 失败再回退 raw URL
 async function fetchState() {
+  // 优先 Worker /api/data
+  if (dashboardPassword) {
+    try {
+      const r = await fetch(DATA_URL + "?t=" + Date.now(), {
+        cache: "no-store",
+        headers: { "X-Auth-Token": dashboardPassword },
+      });
+      if (r.ok) {
+        const data = await r.json();
+        state = data.state;
+        if (data.config) {
+          try { config = parseSimpleYaml(data.config); } catch {}
+        }
+        return state;
+      }
+    } catch (e) {
+      console.warn("Worker /api/data 失败, 回退 raw URL:", e);
+    }
+  }
+  // 回退: raw URL (有 CDN 缓存)
   try {
-    const r = await fetch(STATE_URL + "?t=" + Date.now(), { cache: "no-store" });
+    const r = await fetch(STATE_URL_FALLBACK + "?t=" + Date.now(), { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP " + r.status);
     state = await r.json();
   } catch (e) {
@@ -208,8 +232,10 @@ async function fetchState() {
 }
 
 async function fetchConfig() {
+  // 如果 fetchState 已经从 /api/data 拿到 config, 不重复拉
+  if (config) return config;
   try {
-    const r = await fetch(CONFIG_URL + "?t=" + Date.now(), { cache: "no-store" });
+    const r = await fetch(CONFIG_URL_FALLBACK + "?t=" + Date.now(), { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP " + r.status);
     const text = await r.text();
     config = parseSimpleYaml(text);
