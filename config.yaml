@@ -1,37 +1,26 @@
-# TQQQ ç½æ ¼äº¤æä¿¡å· - ç¨æ·éç½®
-# æ¹å® commit æ¨å° GitHub, GitHub Actions ä¸æ¬¡è·å°±ç¨æ°éç½®
-
 ticker: TQQQ
 
-# ä¿¡å·éç½® (UI Tab "è®¾ç½®" çå­æ®µ)
 signal:
-  type: daily        # daily | weekly | monthly
-  drop_threshold: -0.07  # è·å¹è§¦åä¹°å¥ (è´æ°, -0.07 = è· 7%)
-  rise_threshold: 0.08   # æ¶¨å¹è§¦åååº (æ­£æ°, 0.08 = æ¶¨ 8%)
+  type: weekly
+  drop_threshold: -0.07
+  rise_threshold: 0.08
 
-# äº¤æéé¢ (ç¨äº dashboard ä¼°ç®æ¯æ¬¡è¯¥ä¹°/åå è¡)
 trade:
   buy_amount_usd: 500
   sell_amount_usd: 500
 
-# éç¥æ¸ é
 notifications:
-  # ä¸»éé: Pushover ææºæ¨é (iOS, å½åå¯ç¨)
-  # çæ­£ç USER_KEY èµ° GitHub Secrets (PUSHOVER_USER_WENDI, PUSHOVER_USER_HUSBAND)
   pushover:
     enabled: true
     recipients:
       - wendi
-      - husband   # èå¬ç USER_KEY éç½®å¨ secret PUSHOVER_USER_HUSBAND
+      - husband
 
-  # å¤ä»½éé: é®ä»¶ (Gmail SMTP, çæ­£çå¯ç èµ° secret GMAIL_APP_PASSWORD)
-  # ä¸ä¸ Pushover æ¨éæ²¡æ¶å°, é®ç®±éä¹æåº
   email:
     enabled: true
     to:
       - wendizeng11@gmail.com
       - pengfukang@gmail.com
 
-# éç¥æ¶æ®µ (é»è®¤ä»ç¾è¡çä¸­ = ET 9:30-16:00 = åäº¬ 21:30-æ¬¡æ¥ 04:00)
 quiet_hours:
-  market_only: true  # true ååªå¨ç¾è¡çä¸­æé
+  market_only: true
