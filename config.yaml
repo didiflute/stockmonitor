@@ -1,7 +1,7 @@
 ticker: TQQQ
 
 signal:
-  type: daily
+  type: weekly
   drop_threshold: -0.07
   rise_threshold: 0.08
 
