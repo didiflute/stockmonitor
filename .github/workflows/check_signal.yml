@@ -48,5 +48,16 @@ jobs:
           if [ -n "$(git status --porcelain state.json)" ]; then
             git add state.json
             git commit -m "chore: update state.json [skip ci]"
-            git push
+            # 推送, 如果被拒绝 (有人同时改了仓库) 就 rebase 重试, 最多 5 次
+            for i in 1 2 3 4 5; do
+              if git push; then
+                echo "push 成功"
+                exit 0
+              fi
+              echo "push 被拒, rebase 后重试 (尝试 $i/5)..."
+              git pull --rebase origin main || git rebase --abort
+              sleep $((RANDOM % 5 + 2))
+            done
+            echo "经过 5 次重试仍失败, 但 state.json 已更新; 下次 cron 会重新写入"
+            exit 0  # 不算失败 - 下次会重试
           fi
