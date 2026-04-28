@@ -15,7 +15,7 @@ const ALLOWED_USERS = new Set(["wz", "fp"]);
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, X-Auth-Token, X-User-Id",
   "Access-Control-Max-Age": "86400",
 };
@@ -350,6 +350,28 @@ async function handleRefresh(env) {
   return jsonResp({ ok: true, message: "workflow triggered" });
 }
 
+// 代理 state.json + config.yaml 读取, 绕过 raw URL CDN 缓存
+async function handleGetData(env) {
+  const [stateFile, configFile] = await Promise.all([
+    ghGetFile(env, "state.json"),
+    ghGetFile(env, "config.yaml"),
+  ]);
+  let parsedState = null;
+  try {
+    parsedState = JSON.parse(stateFile.content);
+  } catch {}
+  return new Response(
+    JSON.stringify({ state: parsedState, config: configFile.content }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        ...CORS_HEADERS,
+      },
+    }
+  );
+}
+
 // ---------- config.yaml regex patch ----------
 
 function patchConfigYaml(yamlText, updates) {
@@ -399,10 +421,11 @@ export default {
       return jsonResp({ error: "unauthorized" }, 401);
     }
 
-    // /api/refresh /api/config 是共享操作, 不需要 user
+    // 这些端点不需要 user_id (共享 / 只读)
     const isShared = url.pathname === "/api/refresh"
                   || url.pathname === "/api/config"
-                  || url.pathname === "/api/auth";
+                  || url.pathname === "/api/auth"
+                  || url.pathname === "/api/data";
 
     if (!isShared && !ALLOWED_USERS.has(userId)) {
       return jsonResp({ error: "invalid user_id (must be wz or fp)" }, 400);
@@ -419,6 +442,8 @@ export default {
       switch (url.pathname) {
         case "/api/auth":
           return jsonResp({ ok: true });
+        case "/api/data":
+          return await handleGetData(env);
         case "/api/ack":
           return await handleAck(body, userId, env);
         case "/api/undo-ack":
