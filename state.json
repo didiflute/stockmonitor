@@ -49,7 +49,7 @@
       "holding_shares": 84.716,
       "avg_cost": 21.17,
       "cash_flow": 1793.4377200000001,
-      "realized_profit": 801.35475,
+      "realized_profit": 825.35475,
       "acks": [
         {
           "signal_id": "2026-04-28_monthly_sell",
