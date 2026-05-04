@@ -1,19 +1,19 @@
 {
-  "last_run_at": "2026-05-01T22:09:34.939728+00:00",
+  "last_run_at": "2026-05-04T15:02:32.691523+00:00",
   "last_quote": {
-    "price": 65.30000305175781,
-    "timestamp": 1777673374,
+    "price": 65.8550033569336,
+    "timestamp": 1777906951,
     "source": "yahoo",
     "signal_type": "monthly",
-    "change_rate": 0.18867757446015943,
+    "change_rate": 0.17527912395323342,
     "action": "sell",
-    "buy_trigger_price": 51.089550390243524,
-    "sell_trigger_price": 59.32980045318604,
-    "reference_price": 54.9350004196167,
+    "buy_trigger_price": 52.11115544700622,
+    "sell_trigger_price": 60.516180519104005,
+    "reference_price": 56.03350048065185,
     "all_rates": {
-      "daily": 0.027699120410311195,
-      "weekly": 0.048692783125604544,
-      "monthly": 0.18867757446015943
+      "daily": 0.008499238579451118,
+      "weekly": 0.0483794283805965,
+      "monthly": 0.17527912395323342
     },
     "all_actions": {
       "daily": "hold",
@@ -56,6 +56,13 @@
       "action": "sell",
       "price": 65.7300033569336,
       "fired_at": "2026-05-01T14:13:06.675139+00:00"
+    },
+    {
+      "date": "2026-05-04",
+      "signal_type": "monthly",
+      "action": "sell",
+      "price": 65.8550033569336,
+      "fired_at": "2026-05-04T15:02:30.531373+00:00"
     }
   ],
   "users": {
