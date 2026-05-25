@@ -1,8 +1,8 @@
 {
-  "last_run_at": "2026-05-22T22:43:36.030814+00:00",
+  "last_run_at": "2026-05-25T15:44:49.045915+00:00",
   "last_quote": {
     "price": 77.83999633789062,
-    "timestamp": 1779489815,
+    "timestamp": 1779723887,
     "source": "yahoo",
     "signal_type": "monthly",
     "change_rate": 0.10232313063086451,
@@ -161,6 +161,13 @@
       "action": "sell",
       "price": 78.86900329589844,
       "fired_at": "2026-05-22T15:44:07.540910+00:00"
+    },
+    {
+      "date": "2026-05-25",
+      "signal_type": "monthly",
+      "action": "sell",
+      "price": 77.83999633789062,
+      "fired_at": "2026-05-25T15:44:46.257122+00:00"
     }
   ],
   "users": {
