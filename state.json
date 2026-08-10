@@ -1,8 +1,8 @@
 {
-  "last_run_at": "2026-08-10T20:20:42.387922+00:00",
+  "last_run_at": "2026-08-10T21:05:05.270947+00:00",
   "last_quote": {
     "price": 73.80000305175781,
-    "timestamp": 1786393242,
+    "timestamp": 1786395905,
     "source": "yahoo",
     "signal_type": "monthly",
     "change_rate": 0.07523752820867347,
