@@ -1,19 +1,19 @@
 {
-  "last_run_at": "2026-08-20T16:24:46.839965+00:00",
+  "last_run_at": "2026-08-20T16:57:04.084473+00:00",
   "last_quote": {
-    "price": 70.85050201416016,
-    "timestamp": 1787243086,
+    "price": 70.94580078125,
+    "timestamp": 1787245023,
     "source": "yahoo",
     "signal_type": "monthly",
-    "change_rate": 0.012555049027571652,
+    "change_rate": 0.013917004765918284,
     "action": "hold",
     "buy_trigger_price": 65.07396011352539,
     "sell_trigger_price": 75.56976013183595,
     "reference_price": 69.97200012207031,
     "all_rates": {
-      "daily": -0.016784562661830815,
-      "weekly": -0.055150268630262955,
-      "monthly": 0.012555049027571652
+      "daily": -0.015462070706257935,
+      "weekly": -0.05387938117110691,
+      "monthly": 0.013917004765918284
     },
     "all_actions": {
       "daily": "hold",
